@@ -1,0 +1,15 @@
+# Ambiente virtual e cache do Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Planilhas originais com dados pessoais reais (Proteção LGPD)
+raw_private/
+
+# Arquivos temporários de Escrita Atômica (Aula 05)
+*.tmp
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
