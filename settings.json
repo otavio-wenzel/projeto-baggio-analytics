@@ -1,7 +1,0 @@
-{
-    "storage_engine": "sqlite",
-    "sqlite_db_name": "imobiliaria_baggio.db",
-    "filesystem_format": "csv",
-    "auto_backup": true,
-    "theme": "light"
-}
