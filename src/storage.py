@@ -1,13 +1,23 @@
 import io
+import os
 import json
 import hashlib
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+
+# Carrega as variáveis do arquivo .env para a memória volátil (RAM)
+load_dotenv()
 
 # Diretório local de persistência não-volátil (Disco SSD/HDD)
-DATA_DIR = Path("data_store")
+DATA_DIR = Path(os.getenv("DATA_DIR", "data_store"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+LGPD_HASH_SALT = os.getenv("LGPD_HASH_SALT", "padrao_baggio_lgpd")
+
+def gerar_hash_proprietario(documento: str) -> str:
+    texto_blindado = f"{documento.strip()}_{LGPD_HASH_SALT}"
+    return hashlib.sha256(texto_blindado.encode("utf-8")).hexdigest()[:12]
 
 PATH_IMOVEIS = DATA_DIR / "imoveis_anonimizados.json"
 PATH_CONTRATOS = DATA_DIR / "contratos_anonimizados.json"
