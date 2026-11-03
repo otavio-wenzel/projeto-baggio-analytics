@@ -1,0 +1,28 @@
+# 1. Ambientes Virtuais Python
+.venv/
+venv/
+env/
+ENV/
+
+# 2. Cache e Bytecode do Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# 3. Variáveis de Ambiente e Segredos Locais
+.env
+.streamlit/secrets.toml
+
+# 4. Proteção LGPD: Bloqueia planilhas brutas e arquivos temporários de escrita atômica
+*.xlsx
+*.xls
+*.tmp
+*.tmp.json
+
+# 5. Arquivos de Sistema Operacional e IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.ipynb_checkpoints/
