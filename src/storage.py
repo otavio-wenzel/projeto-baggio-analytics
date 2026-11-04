@@ -1,28 +1,30 @@
-import io
 import os
+import io
 import json
 import hashlib
 from pathlib import Path
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
-from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env para a memória volátil (RAM)
+from src.schemas import COLUNAS_SCHEMA_IMOVEIS, COLUNAS_SCHEMA_CONTRATOS
+
 load_dotenv()
 
-# Diretório local de persistência não-volátil (Disco SSD/HDD)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data_store"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-LGPD_HASH_SALT = os.getenv("LGPD_HASH_SALT", "padrao_baggio_lgpd")
-
-def gerar_hash_proprietario(documento: str) -> str:
-    texto_blindado = f"{documento.strip()}_{LGPD_HASH_SALT}"
-    return hashlib.sha256(texto_blindado.encode("utf-8")).hexdigest()[:12]
+LGPD_HASH_SALT = os.getenv("LGPD_HASH_SALT", "baggio_curitiba_2026_seguro")
 
 PATH_IMOVEIS = DATA_DIR / "imoveis_anonimizados.json"
 PATH_CONTRATOS = DATA_DIR / "contratos_anonimizados.json"
+CONFIG_FILE = Path("settings.json")
 
-# Assinaturas estruturais baseadas em Conjuntos (Sets - Filtro Exclusivo)
+DEFAULT_CONFIG = {
+    "theme": "Automático",
+    "font_size": 14,
+    "auto_save": True
+}
+
 ASSINATURA_IMOVEIS = {
     "Referência", "Bairro", "Tipo", "Status", "Valor Líquido",
     "Taxa de Condominio", "Área Total (m2)", "Total de Quartos", "Repasse Garantido"
@@ -33,7 +35,6 @@ ASSINATURA_CONTRATOS = {
     "Data de Rescisão", "Data de Término", "Garantia", "Tipo de Contrato"
 }
 
-# Listas de colunas sensíveis (PII) para descarte imediato em RAM (LGPD)
 COLUNAS_PII_IMOVEIS = [
     "Propr. - Nome | Razão Social", "Propr. - Nome Fantasia", "Propr. - CPF | CPNJ",
     "Propr. - RG | IE", "Propr. - Email Principal", "Propr. - Outros emails",
@@ -56,14 +57,38 @@ COLUNAS_PII_CONTRATOS = [
 ]
 
 
+def carregar_configuracoes() -> dict:
+    """Carrega preferências do usuário (tema escuro/claro/automático) via settings.json."""
+    if not CONFIG_FILE.exists():
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(DEFAULT_CONFIG, f, indent=4, ensure_ascii=False)
+        return DEFAULT_CONFIG.copy()
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return DEFAULT_CONFIG.copy()
+
+
+def salvar_configuracoes(novas_opcoes: dict) -> None:
+    """Persiste configurações de interface em disco usando escrita segura UTF-8."""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(novas_opcoes, f, indent=4, ensure_ascii=False)
+
+
+def gerar_hash_proprietario(documento: str) -> str:
+    """Criptografa CPF/CNPJ em Hash SHA-256 truncado com Salt de segurança."""
+    doc_limpo = str(documento).strip()
+    if not doc_limpo or doc_limpo.lower() == "nan":
+        return "nao_informado"
+    texto_blindado = f"{doc_limpo}_{LGPD_HASH_SALT}"
+    return hashlib.sha256(texto_blindado.encode("utf-8")).hexdigest()[:12]
+
+
 def ler_arquivo_flexivel(uploaded_file) -> pd.DataFrame:
-    """
-    Lê arquivos .csv, .json, .xml ou .xlsx em memória volátil (RAM)
-    ignorando o nome do arquivo para fins de negócio e prevenindo Path Traversal.
-    """
+    """Lê arquivos CSV, JSON, XML ou XLSX em memória volátil (RAM)."""
     nome_seguro = Path(uploaded_file.name).name.lower()
-    conteudo_bytes = uploaded_file.read()
-    buffer = io.BytesIO(conteudo_bytes)
+    buffer = io.BytesIO(uploaded_file.read())
 
     if nome_seguro.endswith(".csv"):
         try:
@@ -77,59 +102,40 @@ def ler_arquivo_flexivel(uploaded_file) -> pd.DataFrame:
         return pd.read_xml(buffer)
     elif nome_seguro.endswith((".xlsx", ".xls")):
         xls = pd.ExcelFile(buffer)
-        primeira_aba = xls.sheet_names[0]
-        return pd.read_excel(buffer, sheet_name=primeira_aba)
-    else:
-        raise ValueError("Formato não suportado. Envie arquivos CSV, JSON, XML ou XLSX.")
+        return pd.read_excel(buffer, sheet_name=xls.sheet_names[0])
+    raise ValueError("Formato inválido. Utilize CSV, JSON, XML ou XLSX.")
 
 
 def identificar_modelo_estrutural(df: pd.DataFrame) -> str:
-    """
-    Validação de Payload: reconhece se a tabela é de Imóveis ou Contratos
-    exclusivamente pela estrutura de colunas usando Conjuntos (Sets).
-    """
-    colunas_presentes = set(df.columns)
-    if ASSINATURA_IMOVEIS.issubset(colunas_presentes):
+    """Identifica o modelo da tabela pela interseção de conjuntos de colunas."""
+    colunas = set(df.columns)
+    if ASSINATURA_IMOVEIS.issubset(colunas):
         return "imoveis"
-    if ASSINATURA_CONTRATOS.issubset(colunas_presentes):
+    if ASSINATURA_CONTRATOS.issubset(colunas):
         return "contratos"
     return "invalido"
 
 
 def anonimizar_imoveis_lgpd(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Aplica padronização textual, gera o Hash SHA-256 do proprietário
-    em memória RAM e descarta todas as colunas PII (LGPD).
-    """
+    """Padroniza categorias, aplica Hashing SHA-256 no CPF/CNPJ e descarta PII."""
     df_clean = df.copy()
-    cols_texto = ["Bairro", "Tipo", "Status", "Repasse Garantido", "Tx. Adm. Incide Sobre", "Motivo de Baixa"]
-    for col in cols_texto:
+    for col in ["Bairro", "Tipo", "Status", "Repasse Garantido", "Tx. Adm. Incide Sobre", "Motivo de Baixa"]:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].astype(str).str.strip().replace("nan", np.nan)
 
-    # Reciclagem do documento em Hash SHA-256 antes do descarte
     if "Propr. - CPF | CPNJ" in df_clean.columns:
-        df_clean["Hash_Proprietario"] = (
-            df_clean["Propr. - CPF | CPNJ"]
-            .astype(str)
-            .str.strip()
-            .apply(lambda doc: hashlib.sha256(doc.encode("utf-8")).hexdigest()[:12])
-        )
+        df_clean["Hash_Proprietario"] = df_clean["Propr. - CPF | CPNJ"].apply(gerar_hash_proprietario)
     elif "Hash_Proprietario" not in df_clean.columns:
         df_clean["Hash_Proprietario"] = "nao_informado"
 
-    colunas_para_remover = [c for c in COLUNAS_PII_IMOVEIS if c in df_clean.columns]
-    df_clean = df_clean.drop(columns=colunas_para_remover)
-    return df_clean
+    cols_remover = [c for c in COLUNAS_PII_IMOVEIS if c in df_clean.columns]
+    return df_clean.drop(columns=cols_remover)
 
 
 def recalcular_porte_carteira(df_imoveis: pd.DataFrame) -> pd.DataFrame:
-    """
-    Recalcula o porte do investidor sobre a base consolidada usando o Hash_Proprietario,
-    garantindo atualização precisa quando novos lotes de imóveis forem enviados.
-    """
+    """Recalcula o porte do proprietário sobre a base consolidada via Hash_Proprietario."""
     df_out = df_imoveis.copy()
-    if "Hash_Proprietario" in df_out.columns:
+    if "Hash_Proprietario" in df_out.columns and not df_out.empty:
         contagem = df_out["Hash_Proprietario"].value_counts()
         df_out["Qtd_Imoveis_Proprietario"] = df_out["Hash_Proprietario"].map(contagem).fillna(1)
         df_out["Faixa_Carteira_Prop"] = pd.cut(
@@ -141,25 +147,17 @@ def recalcular_porte_carteira(df_imoveis: pd.DataFrame) -> pd.DataFrame:
 
 
 def anonimizar_contratos_lgpd(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Padroniza strings e descarta todas as colunas sensíveis de inquilinos e proprietários.
-    """
+    """Padroniza strings e remove todas as colunas sensíveis de contratos."""
     df_clean = df.copy()
-    cols_texto = ["Garantia", "Tipo de Contrato", "Motivo de Rescisão", "Status"]
-    for col in cols_texto:
+    for col in ["Garantia", "Tipo de Contrato", "Motivo de Rescisão", "Status"]:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].astype(str).str.strip().replace("nan", np.nan)
-
-    colunas_para_remover = [c for c in COLUNAS_PII_CONTRATOS if c in df_clean.columns]
-    df_clean = df_clean.drop(columns=colunas_para_remover)
-    return df_clean
+    cols_remover = [c for c in COLUNAS_PII_CONTRATOS if c in df_clean.columns]
+    return df_clean.drop(columns=cols_remover)
 
 
 def salvar_atomico_json(df: pd.DataFrame, caminho_destino: Path) -> None:
-    """
-    Escrita Atômica recomendada em aula: grava primeiro em um arquivo temporário (.tmp)
-    usando Context Manager (with open e UTF-8) e depois substitui o arquivo oficial.
-    """
+    """Grava em arquivo temporário e substitui o oficial (Escrita Atômica)."""
     caminho_temp = caminho_destino.with_suffix(".tmp.json")
     registros = json.loads(df.to_json(orient="records", date_format="iso"))
     with open(caminho_temp, mode="w", encoding="utf-8") as f:
@@ -168,66 +166,127 @@ def salvar_atomico_json(df: pd.DataFrame, caminho_destino: Path) -> None:
 
 
 def carregar_base_persistida(caminho: Path) -> pd.DataFrame:
-    """
-    Carrega a base JSON persistida em disco utilizando Context Manager seguro.
-    """
+    """Lê a base JSON persistida em disco."""
     if not caminho.exists():
         return pd.DataFrame()
     with open(caminho, mode="r", encoding="utf-8") as f:
-        dados = json.load(f)
-    return pd.DataFrame(dados)
+        return pd.DataFrame(json.load(f))
 
 
 def ingerir_e_persistir_lote(uploaded_file) -> dict:
-    """
-    Pipeline completo de Ingestão:
-    1. Lê qualquer formato válido em RAM;
-    2. Reconhece o modelo pela estrutura de colunas;
-    3. Anonimiza PII (LGPD);
-    4. Mescla com o histórico e elimina duplicidades mantendo o registro mais recente (Upsert);
-    5. Persiste com escrita atômica.
-    """
+    """Ingere arquivo em lote, valida estrutura, anonimiza e realiza Upsert sem duplicar."""
     df_bruto = ler_arquivo_flexivel(uploaded_file)
     modelo = identificar_modelo_estrutural(df_bruto)
 
     if modelo == "invalido":
-        raise ValueError(
-            "A estrutura das colunas não corresponde ao modelo de Imóveis nem ao de Contratos Rescindidos."
-        )
+        raise ValueError("Estrutura de colunas incompatível com os modelos de Imóveis ou Contratos.")
 
     if modelo == "imoveis":
         df_novo = anonimizar_imoveis_lgpd(df_bruto)
-        df_historico = carregar_base_persistida(PATH_IMOVEIS)
-        qtd_antes = len(df_historico)
-
-        df_consolidado = pd.concat([df_historico, df_novo], ignore_index=True)
-        df_consolidado = df_consolidado.drop_duplicates(subset=["Referência"], keep="last").copy()
-        df_consolidado = recalcular_porte_carteira(df_consolidado)
-
-        salvar_atomico_json(df_consolidado, PATH_IMOVEIS)
-        novos_inseridos = len(df_consolidado) - qtd_antes
+        df_hist = carregar_base_persistida(PATH_IMOVEIS)
+        qtd_antes = len(df_hist)
+        df_cons = pd.concat([df_hist, df_novo], ignore_index=True)
+        df_cons = df_cons.drop_duplicates(subset=["Referência"], keep="last").copy()
+        df_cons = recalcular_porte_carteira(df_cons)
+        salvar_atomico_json(df_cons, PATH_IMOVEIS)
+        novos = max(0, len(df_cons) - qtd_antes)
         return {
             "tipo": "Base de Imóveis",
-            "lidos_no_arquivo": len(df_bruto),
-            "novos_absorvidos": max(0, novos_inseridos),
-            "duplicados_atualizados": len(df_bruto) - max(0, novos_inseridos),
-            "total_persistido": len(df_consolidado)
+            "lidos": len(df_bruto),
+            "novos": novos,
+            "atualizados": len(df_bruto) - novos,
+            "total": len(df_cons)
         }
 
-    else:
-        df_novo = anonimizar_contratos_lgpd(df_bruto)
-        df_historico = carregar_base_persistida(PATH_CONTRATOS)
-        qtd_antes = len(df_historico)
+    df_novo = anonimizar_contratos_lgpd(df_bruto)
+    df_hist = carregar_base_persistida(PATH_CONTRATOS)
+    qtd_antes = len(df_hist)
+    df_cons = pd.concat([df_hist, df_novo], ignore_index=True)
+    df_cons = df_cons.drop_duplicates(subset=["Referência Contrato"], keep="last").copy()
+    salvar_atomico_json(df_cons, PATH_CONTRATOS)
+    novos = max(0, len(df_cons) - qtd_antes)
+    return {
+        "tipo": "Contratos Rescindidos",
+        "lidos": len(df_bruto),
+        "novos": novos,
+        "atualizados": len(df_bruto) - novos,
+        "total": len(df_cons)
+    }
 
-        df_consolidado = pd.concat([df_historico, df_novo], ignore_index=True)
-        df_consolidado = df_consolidado.drop_duplicates(subset=["Referência Contrato"], keep="last").copy()
 
-        salvar_atomico_json(df_consolidado, PATH_CONTRATOS)
-        novos_inseridos = len(df_consolidado) - qtd_antes
+def inserir_registro_manual(tipo_tabela: str, dados_formulario: dict) -> dict:
+    """
+    Inclui manualmente um Imóvel ou Contrato preenchendo todas as colunas do esquema,
+    aplicando criptografia SHA-256 e descarte LGPD em memória antes da escrita atômica.
+    """
+    if tipo_tabela == "imovel":
+        registro_completo = {col: np.nan for col in COLUNAS_SCHEMA_IMOVEIS}
+        registro_completo.update(dados_formulario)
+        df_unitario = pd.DataFrame([registro_completo])
+        df_curado = anonimizar_imoveis_lgpd(df_unitario)
+
+        df_hist = carregar_base_persistida(PATH_IMOVEIS)
+        df_cons = pd.concat([df_hist, df_curado], ignore_index=True)
+        df_cons = df_cons.drop_duplicates(subset=["Referência"], keep="last").copy()
+        df_cons = recalcular_porte_carteira(df_cons)
+        salvar_atomico_json(df_cons, PATH_IMOVEIS)
         return {
-            "tipo": "Contratos Rescindidos",
-            "lidos_no_arquivo": len(df_bruto),
-            "novos_absorvidos": max(0, novos_inseridos),
-            "duplicados_atualizados": len(df_bruto) - max(0, novos_inseridos),
-            "total_persistido": len(df_consolidado)
+            "referencia": dados_formulario.get("Referência"),
+            "hash_gerado": df_curado["Hash_Proprietario"].iloc[0],
+            "total": len(df_cons)
         }
+
+    registro_completo = {col: np.nan for col in COLUNAS_SCHEMA_CONTRATOS}
+    registro_completo.update(dados_formulario)
+    df_unitario = pd.DataFrame([registro_completo])
+    df_curado = anonimizar_contratos_lgpd(df_unitario)
+
+    df_hist = carregar_base_persistida(PATH_CONTRATOS)
+    df_cons = pd.concat([df_hist, df_curado], ignore_index=True)
+    df_cons = df_cons.drop_duplicates(subset=["Referência Contrato"], keep="last").copy()
+    salvar_atomico_json(df_cons, PATH_CONTRATOS)
+    return {
+        "referencia": dados_formulario.get("Referência Contrato"),
+        "hash_gerado": "Anonimizado (PII Descartada)",
+        "total": len(df_cons)
+    }
+
+
+def atualizar_imovel_crud(referencia: str, campos_atualizados: dict) -> bool:
+    """
+    Atualiza atributos de um imóvel existente (Status, Reentrada na carteira,
+    Motivo/Data de Baixa, Aluguel, Condomínio ou Repasse) com escrita atômica.
+    """
+    df_hist = carregar_base_persistida(PATH_IMOVEIS)
+    if df_hist.empty or "Referência" not in df_hist.columns:
+        return False
+
+    mascara = df_hist["Referência"].astype(str) == str(referencia)
+    if not mascara.any():
+        return False
+
+    for col, valor in campos_atualizados.items():
+        if col == "Propr. - CPF | CPNJ" and valor:
+            df_hist.loc[mascara, "Hash_Proprietario"] = gerar_hash_proprietario(str(valor))
+        elif col in df_hist.columns:
+            df_hist.loc[mascara, col] = valor
+
+    df_hist = recalcular_porte_carteira(df_hist)
+    salvar_atomico_json(df_hist, PATH_IMOVEIS)
+    return True
+
+
+def remover_imovel_crud(referencia: str) -> bool:
+    """Remove um imóvel específico pela Referência e recalcula as carteiras."""
+    df_hist = carregar_base_persistida(PATH_IMOVEIS)
+    if df_hist.empty or "Referência" not in df_hist.columns:
+        return False
+
+    qtd_antes = len(df_hist)
+    df_filtrado = df_hist[df_hist["Referência"].astype(str) != str(referencia)].copy()
+    if len(df_filtrado) == qtd_antes:
+        return False
+
+    df_filtrado = recalcular_porte_carteira(df_filtrado)
+    salvar_atomico_json(df_filtrado, PATH_IMOVEIS)
+    return True
