@@ -19,6 +19,8 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from scipy.cluster.hierarchy import dendrogram, linkage
 
+from src.schemas import formatar_rotulo
+
 
 def preparar_matriz_features(df_limpo: pd.DataFrame):
     """Prepara matriz X (numéricas + One-Hot Encoding) para treinamento supervisionado."""
@@ -48,44 +50,38 @@ def preparar_matriz_features(df_limpo: pd.DataFrame):
 
 
 def instanciar_regressor(nome_alg: str, alpha: float = 1.0, max_depth: int = 5, n_estimators: int = 100):
-    """Instancia o regressor configurado com pipeline de padronização quando aplicável."""
     match nome_alg:
-        case "Baseline (DummyRegressor)":
+        case "Baseline (Média do Treino)":
             return DummyRegressor(strategy="mean")
-        case "LinearRegression (OLS)":
+        case "Regressão Linear (OLS)":
             return make_pipeline(StandardScaler(), LinearRegression())
-        case "Ridge (Penalidade L2)":
+        case "Regressão Ridge (Penalidade L2)":
             return make_pipeline(StandardScaler(), Ridge(alpha=alpha, random_state=42))
-        case "Lasso (Penalidade L1)":
+        case "Regressão Lasso (Penalidade L1)":
             return make_pipeline(StandardScaler(), Lasso(alpha=alpha, random_state=42))
-        case "DecisionTreeRegressor":
+        case "Árvore de Decisão (Regressor)":
             return DecisionTreeRegressor(max_depth=max_depth, random_state=42)
         case _:
             return RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
 
 
 def diagnosticar_ajuste(rmse_treino: float, rmse_cv: float, r2_teste: float) -> str:
-    """Diagnostica Underfitting, Bom Ajuste ou Overfitting conforme critérios da aula."""
     if r2_teste <= 0.01:
-        return "⚠️ Underfitting / Alta Variância na Amostra (Ajuste a regularização α ou limite max_depth)"
+        return "⚠️ Subajuste / Alta Variância (Ajuste α ou Profundidade)"
     if rmse_treino < 0.55 * rmse_cv:
-        return "🚨 Indício de Overfitting (Treino muito superior à Validação — reduza max_depth ou aumente α)"
-    return "✅ Bom Ajuste (Equilíbrio saudável entre Treino, Validação K-Fold e Teste)"
+        return "🚨 Indício de Sobreajuste (Reduza a Profundidade ou aumente α)"
+    return "✅ Bom Ajuste (Equilíbrio entre Treino, Validação e Teste)"
 
 
 def treinar_e_comparar_regressores(
     df_limpo: pd.DataFrame,
-    algoritmo_principal: str = "RandomForestRegressor",
+    algoritmo_principal: str = "Floresta Aleatória (Random Forest)",
     modelos_comparacao: list = None,
     alpha: float = 2.0,
     max_depth: int = 4,
     n_estimators: int = 100,
     test_size: float = 0.2
 ):
-    """
-    Executa o treinamento dinâmico do modelo principal, compara contra o Baseline (Dummy)
-    e demais modelos selecionados via Validação Cruzada K-Fold (5 partes) e gera o gráfico Real vs Predito.
-    """
     X, _, _ = preparar_matriz_features(df_limpo)
     y = df_limpo["Meses_Locados"].values
 
@@ -93,7 +89,7 @@ def treinar_e_comparar_regressores(
     n_folds = min(5, max(2, len(X_train) // 4))
     kfold = KFold(n_splits=n_folds, shuffle=True, random_state=42)
 
-    lista_modelos = ["Baseline (DummyRegressor)", algoritmo_principal]
+    lista_modelos = ["Baseline (Média do Treino)", algoritmo_principal]
     if modelos_comparacao:
         for m in modelos_comparacao:
             if m not in lista_modelos:
@@ -117,13 +113,13 @@ def treinar_e_comparar_regressores(
         r2_te = float(r2_score(y_test, y_pred_te) * 100)
 
         linhas_tabela.append({
-            "Modelo": nome,
-            "CV RMSE Médio": round(float(scores_cv.mean()), 2),
-            "CV Desvio (±)": round(float(scores_cv.std()), 2),
-            "Teste MAE (m)": round(mae_te, 2),
-            "Teste RMSE (m)": round(rmse_te, 2),
-            "Teste R² (%)": round(r2_te, 2),
-            "Diagnóstico": diagnosticar_ajuste(rmse_tr, float(scores_cv.mean()), r2_te / 100.0)
+            "Modelo Avaliado": nome,
+            "RMSE Validação (K-Fold)": round(float(scores_cv.mean()), 2),
+            "Desvio K-Fold (±)": round(float(scores_cv.std()), 2),
+            "Erro Médio (MAE Meses)": round(mae_te, 2),
+            "Raiz do Erro (RMSE Meses)": round(rmse_te, 2),
+            "Coeficiente R² (%)": round(r2_te, 2),
+            "Diagnóstico do Modelo": diagnosticar_ajuste(rmse_tr, float(scores_cv.mean()), r2_te / 100.0)
         })
 
         if nome == algoritmo_principal:
@@ -131,38 +127,37 @@ def treinar_e_comparar_regressores(
 
     df_comparativo = pd.DataFrame(linhas_tabela)
 
-    # Extração de Pesos Beta ou Importância das Variáveis do Modelo Principal
     estimador_interno = (
         modelo_treinado_principal.steps[-1][1]
         if hasattr(modelo_treinado_principal, "steps")
         else modelo_treinado_principal
     )
+    rotulos_limpos_x = [formatar_rotulo(c) for c in X.columns]
     if hasattr(estimador_interno, "coef_"):
-        pesos = pd.DataFrame({"Variável": X.columns, "Impacto": estimador_interno.coef_})
+        pesos = pd.DataFrame({"Variável": rotulos_limpos_x, "Impacto": estimador_interno.coef_})
     elif hasattr(estimador_interno, "feature_importances_"):
-        pesos = pd.DataFrame({"Variável": X.columns, "Impacto": estimador_interno.feature_importances_})
+        pesos = pd.DataFrame({"Variável": rotulos_limpos_x, "Impacto": estimador_interno.feature_importances_})
     else:
-        pesos = pd.DataFrame({"Variável": X.columns, "Impacto": np.zeros(len(X.columns))})
+        pesos = pd.DataFrame({"Variável": rotulos_limpos_x, "Impacto": np.zeros(len(X.columns))})
     pesos = pesos.sort_values(by="Impacto", ascending=True)
 
-    # Painel Duplo: Gráfico Real vs Predito (Aula) + Pesos/Importâncias
-    fig_diag, axes = plt.subplots(1, 2, figsize=(13.5, 4.6))
+    fig_diag, axes = plt.subplots(1, 2, figsize=(9.6, 3.4))
     y_p_main = predicoes_teste[algoritmo_principal]
-    y_p_base = predicoes_teste["Baseline (DummyRegressor)"]
+    y_p_base = predicoes_teste["Baseline (Média do Treino)"]
 
-    axes[0].scatter(y_test, y_p_main, alpha=0.85, color="#2563eb", s=70, edgecolor="black", label=algoritmo_principal)
-    axes[0].scatter(y_test, y_p_base, alpha=0.65, color="#6b7280", marker="X", s=55, label="Baseline (Média)")
-    axes[0].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], "--r", lw=2, label="Ideal (y = ŷ)")
-    axes[0].set_title("Gráfico Real vs. Predito (Conjunto de Teste)", fontweight="bold")
-    axes[0].set_xlabel("Valores Reais (Meses Locados)")
-    axes[0].set_ylabel("Valores Preditos (Meses Locados)")
-    axes[0].legend(fontsize=8.5)
+    axes[0].scatter(y_test, y_p_main, alpha=0.85, color="#2563eb", s=55, edgecolor="black", label=algoritmo_principal)
+    axes[0].scatter(y_test, y_p_base, alpha=0.65, color="#6b7280", marker="X", s=45, label="Baseline (Média)")
+    axes[0].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], "--r", lw=1.8, label="Ajuste Ideal (y = ŷ)")
+    axes[0].set_title("Real vs. Predito (Conjunto de Teste)", fontweight="bold")
+    axes[0].set_xlabel("Tempo Real de Permanência (Meses)")
+    axes[0].set_ylabel("Tempo Predito (Meses)")
+    axes[0].legend(fontsize=8)
 
     top_p = pd.concat([pesos.head(5), pesos.tail(5)]).drop_duplicates()
     cores_p = ["#dc2626" if v < 0 else "#10b981" for v in top_p["Impacto"]]
     axes[1].barh(top_p["Variável"], top_p["Impacto"], color=cores_p, edgecolor="black")
-    axes[1].axvline(0, color="black", lw=1.2)
-    axes[1].set_title(f"Pesos / Importância das Variáveis ({algoritmo_principal})", fontweight="bold")
+    axes[1].axvline(0, color="black", lw=1.1)
+    axes[1].set_title(f"Impacto das Variáveis ({algoritmo_principal})", fontweight="bold")
     plt.tight_layout()
 
     return modelo_treinado_principal, X.columns.tolist(), df_comparativo, fig_diag
@@ -171,13 +166,12 @@ def treinar_e_comparar_regressores(
 def treinar_classificador_configuravel(
     df_limpo: pd.DataFrame,
     alvo_nome: str = "Quebra_Antecipada",
-    algoritmo: str = "RandomForestClassifier",
+    algoritmo: str = "Floresta Aleatória (Classificador)",
     param_c_ou_k: float = 3.0,
     max_depth: int = 5,
     n_estimators: int = 100,
     test_size: float = 0.2
 ):
-    """Treina classificador configurável e retorna modelo + probabilidade de risco."""
     X, _, _ = preparar_matriz_features(df_limpo)
     y = df_limpo[alvo_nome].astype(int).values
 
@@ -186,23 +180,36 @@ def treinar_classificador_configuravel(
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=test_size, random_state=42)
 
     match algoritmo:
-        case "LogisticRegression":
+        case "Regressão Logística":
             clf = LogisticRegression(C=float(param_c_ou_k), max_iter=500, random_state=42)
-        case "KNN (K-Nearest Neighbors)":
+        case "Vizinhos Mais Próximos (KNN)":
             k_viz = max(1, min(int(param_c_ou_k), len(X_train) - 1))
             clf = KNeighborsClassifier(n_neighbors=k_viz)
-        case "DecisionTreeClassifier":
+        case "Árvore de Decisão (Classificador)":
             clf = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
         case _:
             clf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
 
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
+    cm = confusion_matrix(y_test, y_pred)
+
+    fig_cm, ax_cm = plt.subplots(figsize=(6.2, 3.0))
+    sns.heatmap(
+        cm, annot=True, fmt="d", cmap="Blues",
+        xticklabels=["Permanece / Ativo (0)", "Evento de Risco (1)"],
+        yticklabels=["Permanece / Ativo (0)", "Evento de Risco (1)"],
+        ax=ax_cm
+    )
+    ax_cm.set_title(f"Matriz de Confusão — {formatar_rotulo(alvo_nome)}", fontweight="bold")
+    ax_cm.set_xlabel("Classe Prevista pelo Modelo")
+    ax_cm.set_ylabel("Classe Real Observada")
+    plt.tight_layout()
 
     metricas = {
         "Acuracia_Pct": float(accuracy_score(y_test, y_pred) * 100),
         "F1_Score_Pct": float(f1_score(y_test, y_pred, zero_division=0) * 100),
-        "Matriz_Confusao": confusion_matrix(y_test, y_pred)
+        "Figura_CM": fig_cm
     }
     return clf, scaler, X.columns.tolist(), metricas
 
@@ -213,7 +220,6 @@ def executar_pipeline_clusters(
     eps_dbscan: float = 1.1,
     min_samples_dbscan: int = 5
 ):
-    """Executa K-Means, Diagnóstico de K, Dendrograma de Ward, DBSCAN e Mapa PCA 2D."""
     col_aluguel = "Valor Líquido_contrato" if "Valor Líquido_contrato" in df_limpo.columns else "Valor Líquido"
     cols_cluster = [col_aluguel, "Meses_Locados", "Taxa de Condominio", "Qtd_Imoveis_Proprietario"]
     df_clust = df_limpo.dropna(subset=cols_cluster).copy()
@@ -225,39 +231,40 @@ def executar_pipeline_clusters(
     X_scaled = scaler.fit_transform(df_clust[cols_cluster])
 
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    df_clust["Cluster_KMeans"] = kmeans.fit_predict(X_scaled)
-    sil_score = float(silhouette_score(X_scaled, df_clust["Cluster_KMeans"])) if len(df_clust) > n_clusters else 0.0
+    df_clust["Grupo K-Means"] = kmeans.fit_predict(X_scaled)
+    sil_score = float(silhouette_score(X_scaled, df_clust["Grupo K-Means"])) if len(df_clust) > n_clusters else 0.0
 
     dbscan = DBSCAN(eps=eps_dbscan, min_samples=min_samples_dbscan)
-    df_clust["Cluster_DBSCAN"] = dbscan.fit_predict(X_scaled)
+    df_clust["Densidade DBSCAN"] = dbscan.fit_predict(X_scaled)
 
     pca = PCA(n_components=2)
     coords = pca.fit_transform(X_scaled)
-    df_clust["PC1"], df_clust["PC2"] = coords[:, 0], coords[:, 1]
+    df_clust["Eixo PC1"], df_clust["Eixo PC2"] = coords[:, 0], coords[:, 1]
     var_exp = pca.explained_variance_ratio_ * 100
 
-    fig_pca, axes = plt.subplots(1, 2, figsize=(13.5, 4.8))
-    sns.scatterplot(data=df_clust, x="PC1", y="PC2", hue="Cluster_KMeans", palette="viridis", s=75, ax=axes[0])
-    axes[0].set_title(f"Mapa PCA 2D ({var_exp.sum():.1f}% Var.) — {n_clusters} Clusters K-Means", fontweight="bold")
+    fig_pca, axes = plt.subplots(1, 2, figsize=(9.6, 3.5))
+    sns.scatterplot(data=df_clust, x="Eixo PC1", y="Eixo PC2", hue="Grupo K-Means", palette="viridis", s=60, ax=axes[0])
+    axes[0].set_title(f"Mapa PCA 2D ({var_exp.sum():.1f}% Var.) — {n_clusters} Grupos K-Means", fontweight="bold")
 
-    normais = df_clust[df_clust["Cluster_DBSCAN"] != -1]
-    anomalias = df_clust[df_clust["Cluster_DBSCAN"] == -1]
+    normais = df_clust[df_clust["Densidade DBSCAN"] != -1]
+    anomalias = df_clust[df_clust["Densidade DBSCAN"] == -1]
     if not normais.empty:
-        sns.scatterplot(data=normais, x="PC1", y="PC2", hue="Cluster_DBSCAN", palette="Set2", s=70, ax=axes[1])
+        sns.scatterplot(data=normais, x="Eixo PC1", y="Eixo PC2", hue="Densidade DBSCAN", palette="Set2", s=55, ax=axes[1])
     if not anomalias.empty:
-        axes[1].scatter(anomalias["PC1"], anomalias["PC2"], color="crimson", marker="P", s=140, edgecolor="black", label=f"Anomalias (-1): {len(anomalias)}")
-    axes[1].set_title(f"DBSCAN (eps={eps_dbscan}) — Anomalias Operacionais", fontweight="bold")
-    axes[1].legend()
+        axes[1].scatter(anomalias["Eixo PC1"], anomalias["Eixo PC2"], color="crimson", marker="P", s=110, edgecolor="black", label=f"Anomalias (-1): {len(anomalias)}")
+    axes[1].set_title(f"DBSCAN (Raio={eps_dbscan}) — Isolamento de Anomalias", fontweight="bold")
+    axes[1].legend(fontsize=8)
     plt.tight_layout()
 
-    fig_dendro, ax_d = plt.subplots(figsize=(12, 4.0))
+    fig_dendro, ax_d = plt.subplots(figsize=(8.2, 3.2))
     matriz_ward = linkage(X_scaled, method="ward")
     dendrogram(matriz_ward, truncate_mode="lastp", p=25, leaf_rotation=45, show_contracted=True, ax=ax_d)
     ax_d.set_title("Dendrograma Hierárquico Aglomerativo (Método de Ward)", fontweight="bold")
+    ax_d.set_ylabel("Distância de Ward (Inércia WCSS)")
     plt.tight_layout()
 
-    resumo_clusters = df_clust.groupby("Cluster_KMeans").agg(
-        Contratos=("Cluster_KMeans", "count"),
+    resumo_clusters = df_clust.groupby("Grupo K-Means").agg(
+        Contratos=("Grupo K-Means", "count"),
         Aluguel_Medio=(col_aluguel, "mean"),
         Condominio_Medio=("Taxa de Condominio", "mean"),
         Meses_Medio=("Meses_Locados", "mean"),
@@ -265,5 +272,6 @@ def executar_pipeline_clusters(
         Quebra_Pct=("Quebra_Antecipada", lambda s: s.mean() * 100),
         Evasao_Pct=("Proprietario_Evadiu", lambda s: s.mean() * 100)
     ).round(1)
+    resumo_clusters.columns = [formatar_rotulo(c) for c in resumo_clusters.columns]
 
     return df_clust, resumo_clusters, anomalias, sil_score, fig_pca, fig_dendro

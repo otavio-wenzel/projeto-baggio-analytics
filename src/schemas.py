@@ -1,9 +1,8 @@
 """
 Mapeamento integral dos esquemas (115 colunas de Imóveis e 77 de Contratos)
-utilizando Tuplas Imutáveis para garantir integridade estrutural.
+e tradutor de rótulos amigáveis para eliminar underscores (_) no front-end.
 """
 
-# Tupla imutável com todas as 115 colunas originais da planilha de Imóveis
 COLUNAS_SCHEMA_IMOVEIS = (
     "ID", "Filial", "Referência", "Carteira", "Tipo de Angariação", "Tipo", "Status",
     "Tipo de Transação", "Tipo de Venda", "Emissão de NFe", "Dimob", "Condomínio",
@@ -35,7 +34,6 @@ COLUNAS_SCHEMA_IMOVEIS = (
     "Data de Cadastro", "Data de Baixa", "Motivo de Baixa", "Data de Auditoria"
 )
 
-# Tupla imutável com todas as 77 colunas originais da planilha de Contratos Rescindidos
 COLUNAS_SCHEMA_CONTRATOS = (
     "ID", "Filial", "Referência Imóvel", "Referência Contrato", "Carteira", "Status",
     "Data de Entrega das Chaves", "Status Financeiro", "Data de Início", "Data de Término",
@@ -60,7 +58,6 @@ COLUNAS_SCHEMA_CONTRATOS = (
     "Inquilino - Distrito", "Inquilino - Cidade", "Inquilino - Estado"
 )
 
-# Opções padronizadas extraídas das planilhas reais da Imobiliária Baggio
 OPCOES_TIPO_IMOVEL = (
     "Apartamento", "Casa Residencial", "Sobrado", "Casa em Condomínio",
     "Loja", "Salas/Conjuntos", "Barracão/Galpão", "Galpão Industrial",
@@ -107,3 +104,48 @@ BAIRROS_PRINCIPAIS = (
     "Bigorrilho", "Orleans", "Vila Izabel", "Ecoville", "Portão",
     "Água Verde", "Campina do Siqueira", "Santa Quitéria", "Seminário", "São Francisco"
 )
+
+# Dicionário de tradução de variáveis internas (snake_case) para rótulos limpos de negócio
+ROTULOS_AMIGAVEIS = {
+    "Faixa_Carteira_Prop": "Porte da Carteira do Proprietário",
+    "Qtd_Imoveis_Proprietario": "Imóveis por Proprietário",
+    "Hash_Proprietario": "Identificador Anônimo (Hash SHA-256)",
+    "Meses_Locados": "Tempo de Permanência (Meses)",
+    "Quebra_Antecipada": "Quebra Antecipada do Inquilino",
+    "Proprietario_Evadiu": "Evasão do Proprietário (Imóvel Baixado)",
+    "Valor Líquido_contrato": "Aluguel Líquido do Contrato (R$)",
+    "Valor Líquido_imovel": "Aluguel Líquido Cadastrado (R$)",
+    "Valor Líquido": "Valor Líquido do Aluguel (R$)",
+    "Taxa de Condominio": "Taxa de Condomínio (R$)",
+    "Área Total (m2)": "Área Total (m²)",
+    "Tx. Adm. Incide Sobre": "Base da Taxa Administrativa",
+    "Status_imovel": "Status do Imóvel",
+    "Status_contrato": "Status do Contrato",
+    "Cluster_KMeans": "Grupo K-Means (Persona)",
+    "Cluster_DBSCAN": "Classificação DBSCAN (Densidade)",
+    "Outros_Bairros": "Outros Bairros",
+    "Aluguel_Medio": "Aluguel Médio (R$)",
+    "Condominio_Medio": "Condomínio Médio (R$)",
+    "Meses_Medio": "Permanência Média (Meses)",
+    "Imoveis_Prop": "Média de Imóveis / Proprietário",
+    "Quebra_Pct": "Quebra Antecipada (%)",
+    "Evasao_Pct": "Evasão do Proprietário (%)"
+}
+
+
+def formatar_rotulo(nome: str) -> str:
+    """Converte qualquer nome técnico ou coluna com underscore (_) em expressão limpa."""
+    texto = str(nome)
+    if texto in ROTULOS_AMIGAVEIS:
+        return ROTULOS_AMIGAVEIS[texto]
+    if texto.startswith("Bairro_Agrupado_"):
+        return f"Bairro: {texto.replace('Bairro_Agrupado_', '').replace('_', ' ')}"
+    if texto.startswith("Garantia_"):
+        return f"Garantia: {texto.replace('Garantia_', '').replace('_', ' ')}"
+    if texto.startswith("Repasse Garantido_"):
+        return f"Repasse: {texto.replace('Repasse Garantido_', '').replace('_', ' ')}"
+    if texto.startswith("Tx. Adm. Incide Sobre_"):
+        return f"Taxa Adm.: {texto.replace('Tx. Adm. Incide Sobre_', '').replace('_', ' ')}"
+    if texto.startswith("Tipo de Contrato_"):
+        return f"Contrato: {texto.replace('Tipo de Contrato_', '').replace('_', ' ')}"
+    return texto.replace("_", " ")
