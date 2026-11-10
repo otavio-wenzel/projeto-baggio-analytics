@@ -19,7 +19,9 @@ __pycache__/
 *.xls
 *.tmp
 *.tmp.json
-
+# Bloqueia a pasta do banco de dados local e os arquivos JSON
+data_store/
+*.json
 # 5. Arquivos de Sistema Operacional e IDEs
 .DS_Store
 Thumbs.db

@@ -715,7 +715,7 @@ match st.session_state.rota_atual:
                         if novo_cpf_prop.strip():
                             campos_up["Propr. - CPF | CPNJ"] = novo_cpf_prop.strip()
                         atualizar_imovel_crud(ref_busca, campos_up)
-                        st.success(f"✅ Imóvel `{ref_busca}` atualizado para **{novo_status}**!")
+                        st.success(f"Imóvel `{ref_busca}` atualizado para **{novo_status}**!")
                         st.rerun()
 
                     if b_del.form_submit_button("Excluir Imóvel"):
@@ -829,7 +829,7 @@ match st.session_state.rota_atual:
                 st.markdown(f"#### {vista_c}")
                 if vista_c == "Mapa PCA 2D & Segmentação K-Means":
                     exibir_grafico_responsivo(fig_pca, f"fig_pca_{idx_c}")
-                elif vista_c == "🌳 2. Dendrograma Hierárquico de Ward":
+                elif vista_c == "2. Dendrograma Hierárquico de Ward":
                     exibir_grafico_responsivo(fig_dendro, f"fig_dendro_{idx_c}")
                 else:
                     st.markdown("**Resumo Executivo das Personas (Médias por Grupo K-Means)**")
