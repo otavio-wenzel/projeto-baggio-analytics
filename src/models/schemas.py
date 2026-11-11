@@ -1,8 +1,3 @@
-"""
-Mapeamento integral dos esquemas (115 colunas de Imóveis e 77 de Contratos)
-e tradutor de rótulos amigáveis para eliminar underscores (_) no front-end.
-"""
-
 COLUNAS_SCHEMA_IMOVEIS = (
     "ID", "Filial", "Referência", "Carteira", "Tipo de Angariação", "Tipo", "Status",
     "Tipo de Transação", "Tipo de Venda", "Emissão de NFe", "Dimob", "Condomínio",
@@ -58,6 +53,30 @@ COLUNAS_SCHEMA_CONTRATOS = (
     "Inquilino - Distrito", "Inquilino - Cidade", "Inquilino - Estado"
 )
 
+CATALOGO_ANALISES_EDA = [
+    "Escalada Anual de Retiradas",
+    "Sazonalidade Mensal (Picos Automáticos)",
+    "Ranking de Motivos de Evasão / Rescisão",
+    "Política Interna: Repasse Garantido",
+    "Política Interna: Base da Taxa Adm.",
+    "Perfil do Investidor (Porte da Carteira)",
+    "Geografia de Evasão por Bairro",
+    "Garantias Locatícias, IQR & Correlação",
+    "Construtor Livre de Cruzamentos"
+]
+
+CATALOGO_SUBMODULOS_ML = [
+    "Regressão: Permanência & Validação K-Fold",
+    "Classificadores: Risco de Quebra & Evasão",
+    "Simulador Executivo de Novos Contratos"
+]
+
+CATALOGO_SUBMODULOS_CLUSTER = [
+    "Mapa PCA 2D & Segmentação K-Means",
+    "Dendrograma Hierárquico de Ward",
+    "Tabela de Personas & Auditoria DBSCAN"
+]
+
 OPCOES_TIPO_IMOVEL = (
     "Apartamento", "Casa Residencial", "Sobrado", "Casa em Condomínio",
     "Loja", "Salas/Conjuntos", "Barracão/Galpão", "Galpão Industrial",
@@ -105,7 +124,6 @@ BAIRROS_PRINCIPAIS = (
     "Água Verde", "Campina do Siqueira", "Santa Quitéria", "Seminário", "São Francisco"
 )
 
-# Dicionário de tradução de variáveis internas (snake_case) para rótulos limpos de negócio
 ROTULOS_AMIGAVEIS = {
     "Faixa_Carteira_Prop": "Porte da Carteira do Proprietário",
     "Qtd_Imoveis_Proprietario": "Imóveis por Proprietário",
@@ -134,7 +152,6 @@ ROTULOS_AMIGAVEIS = {
 
 
 def formatar_rotulo(nome: str) -> str:
-    """Converte qualquer nome técnico ou coluna com underscore (_) em expressão limpa."""
     texto = str(nome)
     if texto in ROTULOS_AMIGAVEIS:
         return ROTULOS_AMIGAVEIS[texto]
