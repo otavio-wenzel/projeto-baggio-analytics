@@ -1,8 +1,3 @@
-"""
-Camada Model: Repositório de Persistência Não-Volátil (JSON),
-Escrita Atômica, Ingestão Multiformato e Operações CRUD.
-"""
-
 import os
 import io
 import json
@@ -37,7 +32,6 @@ DEFAULT_CONFIG = {
 
 
 def carregar_configuracoes() -> dict:
-    """Carrega preferências do usuário via settings.json."""
     if not CONFIG_FILE.exists():
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(DEFAULT_CONFIG, f, indent=4, ensure_ascii=False)
@@ -50,13 +44,11 @@ def carregar_configuracoes() -> dict:
 
 
 def salvar_configuracoes(novas_opcoes: dict) -> None:
-    """Persiste configurações de interface em disco usando escrita UTF-8."""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(novas_opcoes, f, indent=4, ensure_ascii=False)
 
 
 def ler_arquivo_flexivel(uploaded_file) -> pd.DataFrame:
-    """Lê arquivos CSV, JSON, XML ou XLSX em memória volátil (RAM)."""
     nome_seguro = Path(uploaded_file.name).name.lower()
     buffer = io.BytesIO(uploaded_file.read())
 
@@ -77,7 +69,6 @@ def ler_arquivo_flexivel(uploaded_file) -> pd.DataFrame:
 
 
 def salvar_atomico_json(df: pd.DataFrame, caminho_destino: Path) -> None:
-    """Grava em arquivo temporário e substitui o oficial (Escrita Atômica)."""
     caminho_temp = caminho_destino.with_suffix(".tmp.json")
     registros = json.loads(df.to_json(orient="records", date_format="iso"))
     with open(caminho_temp, mode="w", encoding="utf-8") as f:
@@ -86,7 +77,6 @@ def salvar_atomico_json(df: pd.DataFrame, caminho_destino: Path) -> None:
 
 
 def carregar_base_persistida(caminho: Path) -> pd.DataFrame:
-    """Lê a base JSON persistida em disco."""
     if not caminho.exists():
         return pd.DataFrame()
     with open(caminho, mode="r", encoding="utf-8") as f:
@@ -94,7 +84,6 @@ def carregar_base_persistida(caminho: Path) -> pd.DataFrame:
 
 
 def ingerir_e_persistir_lote(uploaded_file) -> dict:
-    """Ingere arquivo em lote, valida estrutura, anonimiza e realiza Upsert sem duplicar."""
     df_bruto = ler_arquivo_flexivel(uploaded_file)
     modelo = identificar_modelo_estrutural(df_bruto)
 
@@ -135,7 +124,6 @@ def ingerir_e_persistir_lote(uploaded_file) -> dict:
 
 
 def inserir_registro_manual(tipo_tabela: str, dados_formulario: dict) -> dict:
-    """Inclui manualmente um Imóvel ou Contrato com anonimização LGPD e escrita atômica."""
     if tipo_tabela == "imovel":
         registro_completo = {col: np.nan for col in COLUNAS_SCHEMA_IMOVEIS}
         registro_completo.update(dados_formulario)
@@ -170,7 +158,6 @@ def inserir_registro_manual(tipo_tabela: str, dados_formulario: dict) -> dict:
 
 
 def atualizar_imovel_crud(referencia: str, campos_atualizados: dict) -> bool:
-    """Atualiza atributos de um imóvel existente com escrita atômica."""
     df_hist = carregar_base_persistida(PATH_IMOVEIS)
     if df_hist.empty or "Referência" not in df_hist.columns:
         return False
@@ -191,7 +178,6 @@ def atualizar_imovel_crud(referencia: str, campos_atualizados: dict) -> bool:
 
 
 def remover_imovel_crud(referencia: str) -> bool:
-    """Remove um imóvel específico pela Referência e recalcula as carteiras."""
     df_hist = carregar_base_persistida(PATH_IMOVEIS)
     if df_hist.empty or "Referência" not in df_hist.columns:
         return False

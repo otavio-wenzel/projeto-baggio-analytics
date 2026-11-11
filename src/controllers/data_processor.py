@@ -1,8 +1,3 @@
-"""
-Camada Controller: Processamento de dados relacionais, saneamento IQR,
-detecção estatística de picos e padronização gráfica do Matplotlib.
-"""
-
 import textwrap
 import pandas as pd
 import numpy as np
@@ -13,7 +8,6 @@ from src.models.schemas import formatar_rotulo
 
 
 def configurar_estilo_grafico(tema: str = "Claro"):
-    """Configura cores e fontes proporcionais do Matplotlib/Seaborn conforme o tema."""
     plt.rcdefaults()
     params_base = {
         "font.size": 9,
@@ -57,7 +51,6 @@ def configurar_estilo_grafico(tema: str = "Claro"):
 
 
 def formatar_eixo_x(ax, labels, largura_max: int = 16, rotacao: int = 25):
-    """Formata os rótulos sem underscores, com quebra de linha e alinhamento seguro."""
     textos_limpos = [textwrap.fill(formatar_rotulo(lbl), width=largura_max) for lbl in labels]
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(
@@ -70,7 +63,6 @@ def formatar_eixo_x(ax, labels, largura_max: int = 16, rotacao: int = 25):
 
 
 def detectar_picos_automaticos(serie_mensal: pd.Series, nomes_meses: list, sensibilidade_std: float = 0.5):
-    """Detecta automaticamente janelas de pico sazonal acima de Média + (k * Desvio Padrão)."""
     valores = serie_mensal.values.astype(float)
     if len(valores) == 0 or valores.max() == 0:
         return 0.0, 0.0, []
@@ -110,7 +102,6 @@ def preparar_base_cruzada(
     df_contratos: pd.DataFrame,
     multiplicador_iqr: float = 1.5
 ):
-    """Realiza o cruzamento relacional e aplica o corte de Outliers (Q3 + k * IQR)."""
     if df_imoveis.empty or df_contratos.empty:
         return pd.DataFrame(), pd.DataFrame(), 0.0
 
