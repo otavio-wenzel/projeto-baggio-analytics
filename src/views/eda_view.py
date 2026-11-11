@@ -1,7 +1,3 @@
-"""
-Camada View: Tela do Explorador de Análises Independentes (EDA) & Compositor de Sessão.
-"""
-
 import streamlit as st
 import pandas as pd
 

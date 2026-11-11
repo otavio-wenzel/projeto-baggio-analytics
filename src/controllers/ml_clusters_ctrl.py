@@ -1,7 +1,3 @@
-"""
-Camada Controller: Aprendizado Não Supervisionado (K-Means, DBSCAN, PCA e Ward).
-"""
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns

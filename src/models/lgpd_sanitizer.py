@@ -1,8 +1,3 @@
-"""
-Camada Model: Governança LGPD, Hashing SHA-256, Validação Estrutural (Sets)
-e Recálculo de Porte da Carteira do Investidor.
-"""
-
 import os
 import hashlib
 from dotenv import load_dotenv
@@ -46,7 +41,6 @@ COLUNAS_PII_CONTRATOS = [
 
 
 def gerar_hash_proprietario(documento: str) -> str:
-    """Criptografa CPF/CNPJ em Hash SHA-256 truncado com Salt de segurança."""
     doc_limpo = str(documento).strip()
     if not doc_limpo or doc_limpo.lower() == "nan":
         return "nao_informado"
@@ -55,7 +49,6 @@ def gerar_hash_proprietario(documento: str) -> str:
 
 
 def identificar_modelo_estrutural(df: pd.DataFrame) -> str:
-    """Identifica o modelo da tabela pela interseção de conjuntos de colunas."""
     colunas = set(df.columns)
     if ASSINATURA_IMOVEIS.issubset(colunas):
         return "imoveis"
@@ -65,7 +58,6 @@ def identificar_modelo_estrutural(df: pd.DataFrame) -> str:
 
 
 def anonimizar_imoveis_lgpd(df: pd.DataFrame) -> pd.DataFrame:
-    """Padroniza categorias, aplica Hashing SHA-256 no CPF/CNPJ e descarta PII."""
     df_clean = df.copy()
     for col in ["Bairro", "Tipo", "Status", "Repasse Garantido", "Tx. Adm. Incide Sobre", "Motivo de Baixa"]:
         if col in df_clean.columns:
@@ -81,7 +73,6 @@ def anonimizar_imoveis_lgpd(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def recalcular_porte_carteira(df_imoveis: pd.DataFrame) -> pd.DataFrame:
-    """Recalcula o porte do proprietário sobre a base consolidada via Hash_Proprietario."""
     df_out = df_imoveis.copy()
     if "Hash_Proprietario" in df_out.columns and not df_out.empty:
         contagem = df_out["Hash_Proprietario"].value_counts()
@@ -95,7 +86,6 @@ def recalcular_porte_carteira(df_imoveis: pd.DataFrame) -> pd.DataFrame:
 
 
 def anonimizar_contratos_lgpd(df: pd.DataFrame) -> pd.DataFrame:
-    """Padroniza strings e remove todas as colunas sensíveis de contratos."""
     df_clean = df.copy()
     for col in ["Garantia", "Tipo de Contrato", "Motivo de Rescisão", "Status"]:
         if col in df_clean.columns:

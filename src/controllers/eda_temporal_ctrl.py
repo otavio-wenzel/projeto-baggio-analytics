@@ -1,7 +1,3 @@
-"""
-Camada Controller: Análises Exploratórias Temporais e de Motivos (A1, A2 e A3).
-"""
-
 import textwrap
 import pandas as pd
 import matplotlib.pyplot as plt

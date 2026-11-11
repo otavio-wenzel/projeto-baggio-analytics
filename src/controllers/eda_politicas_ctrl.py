@@ -1,8 +1,3 @@
-"""
-Camada Controller: Análises de Políticas Internas, Porte da Carteira,
-Geografia de Bairros, Garantias/IQR e Construtor Livre (A4 a A9).
-"""
-
 import textwrap
 import pandas as pd
 import numpy as np

@@ -1,7 +1,3 @@
-"""
-Camada View: Tela de Ingestão de Dados em Lote, Cadastro Manual e CRUD Discreto.
-"""
-
 from datetime import date
 import streamlit as st
 import pandas as pd

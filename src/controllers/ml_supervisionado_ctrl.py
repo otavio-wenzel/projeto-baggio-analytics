@@ -1,7 +1,3 @@
-"""
-Camada Controller: Aprendizado Supervisionado (Regressão K-Fold e Classificadores de Risco).
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,7 +20,6 @@ from src.models.schemas import formatar_rotulo
 
 
 def preparar_matriz_features(df_limpo: pd.DataFrame):
-    """Prepara matriz X (numéricas + One-Hot Encoding) para treinamento supervisionado."""
     df = df_limpo.copy()
     top_bairros = df["Bairro"].value_counts().head(8).index
     df["Bairro_Agrupado"] = df["Bairro"].where(df["Bairro"].isin(top_bairros), "Outros_Bairros")

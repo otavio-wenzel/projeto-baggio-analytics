@@ -1,7 +1,3 @@
-"""
-Camada View: Tela de Clusterização de Personas (K-Means/Ward) e Anomalias (DBSCAN/PCA).
-"""
-
 import streamlit as st
 import pandas as pd
 

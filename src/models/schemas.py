@@ -1,8 +1,3 @@
-"""
-Camada Model: Mapeamento integral dos esquemas, catálogos do sistema
-e tradutor de rótulos amigáveis para o front-end.
-"""
-
 COLUNAS_SCHEMA_IMOVEIS = (
     "ID", "Filial", "Referência", "Carteira", "Tipo de Angariação", "Tipo", "Status",
     "Tipo de Transação", "Tipo de Venda", "Emissão de NFe", "Dimob", "Condomínio",
@@ -157,7 +152,6 @@ ROTULOS_AMIGAVEIS = {
 
 
 def formatar_rotulo(nome: str) -> str:
-    """Converte qualquer nome técnico ou coluna com underscore (_) em expressão limpa."""
     texto = str(nome)
     if texto in ROTULOS_AMIGAVEIS:
         return ROTULOS_AMIGAVEIS[texto]

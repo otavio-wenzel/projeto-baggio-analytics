@@ -1,7 +1,3 @@
-"""
-Camada View: Tela de Visão Geral & Indicadores Executivos.
-"""
-
 import streamlit as st
 import pandas as pd
 
