@@ -3,7 +3,7 @@
 Aplicação web interativa desenvolvida em Python e Streamlit para diagnóstico operacional, retenção de carteira imobiliária, governança de dados sob a Lei Geral de Proteção de Dados (LGPD) e modelagem preditiva com aprendizado de máquina supervisionado e não supervisionado.
 
 * **Disciplina:** Tópicos Especiais em Software
-* **Professor:** Rhafael Freitas da Costa
+* **Professor:** Rhafael Freitas da Costa - [@hafael-costa-dev](https://github.com/username)
 * **Arquitetura:** Padrão MVC (*Model-View-Controller*) com Princípio da Responsabilidade Única (SRP)
 
 ---
@@ -281,3 +281,5 @@ A modularização em 14 arquivos sob o padrão MVC permite uma divisão clara de
 | **4. Machine Learning Supervisionado & Não Supervisionado** | `src/controllers/ml_supervisionado_ctrl.py`<br>`src/controllers/ml_clusters_ctrl.py`<br>`src/views/ml_view.py`<br>`src/views/clusters_view.py` | *One-Hot Encoding*, validação cruzada K-Fold contra *Baseline*, diagnóstico de *Overfitting/Underfitting*, classificadores de risco, Matriz de Confusão, Simulador Executivo, retreinamento dinâmico, K-Means (Silhueta), DBSCAN, PCA 2D e Ward. |
 
 ---
+
+*Projeto desenvolvido como requisito de avaliação final da disciplina de Tópicos Especiais em Software.*
