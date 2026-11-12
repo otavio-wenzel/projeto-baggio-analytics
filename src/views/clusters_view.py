@@ -6,9 +6,9 @@ from src.views.ui_components import exibir_grafico_responsivo
 from src.controllers.data_processor import preparar_base_cruzada
 from src.controllers.ml_clusters_ctrl import executar_pipeline_clusters
 
-
 def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFrame):
     st.subheader("Segmentação de Personas (K-Means & Ward) e Auditoria de Anomalias (DBSCAN + PCA)")
+    
     _, df_limpo, _ = preparar_base_cruzada(df_imoveis, df_contratos)
 
     if len(df_limpo) < 15:
@@ -16,6 +16,7 @@ def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFram
         return
 
     c_cl1, c_cl2 = st.columns([2, 2])
+    
     idx_cl = CATALOGO_SUBMODULOS_CLUSTER.index(st.session_state.submodulo_cluster_ativo) if st.session_state.submodulo_cluster_ativo in CATALOGO_SUBMODULOS_CLUSTER else 0
     escolha_cl = c_cl1.selectbox(
         "Visualização Principal de Clusterização:",
@@ -28,6 +29,7 @@ def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFram
 
     opcoes_extras_cl = [c for c in CATALOGO_SUBMODULOS_CLUSTER if c != st.session_state.submodulo_cluster_ativo]
     cl_agrupados = c_cl2.multiselect(
+        label="Agrupar Mais Vistas de Cluster nesta Sessão (Opcional):",
         options=opcoes_extras_cl,
         default=[],
         key=f"agr_cl_{st.session_state.submodulo_cluster_ativo}"
@@ -45,10 +47,12 @@ def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFram
     m2.metric("Anomalias Isoladas pelo DBSCAN (-1)", len(anomalias_db))
 
     fila_cl = [st.session_state.submodulo_cluster_ativo] + cl_agrupados
+    
     for idx_c, vista_c in enumerate(fila_cl):
         if idx_c > 0:
             st.divider()
         st.markdown(f"#### {vista_c}")
+        
         if vista_c == "Mapa PCA 2D & Segmentação K-Means":
             exibir_grafico_responsivo(fig_pca, f"fig_pca_{idx_c}")
         elif vista_c == "Dendrograma Hierárquico de Ward":
@@ -56,7 +60,9 @@ def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFram
         else:
             st.markdown("**Resumo Executivo das Personas (Médias por Grupo K-Means)**")
             st.dataframe(resumo_p, use_container_width=True)
+            
             st.markdown(f"**Contratos Anômalos Auditados pelo DBSCAN ({len(anomalias_db)} registros)**")
+            
             cols_a = [c for c in ["Referência Imóvel", "Bairro", "Tipo", "Valor Líquido_contrato", "Taxa de Condominio", "Meses_Locados", "Qtd_Imoveis_Proprietario"] if c in anomalias_db.columns]
             df_anom_limpo = anomalias_db[cols_a].copy()
             df_anom_limpo.columns = [formatar_rotulo(c) for c in df_anom_limpo.columns]

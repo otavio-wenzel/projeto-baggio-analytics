@@ -1,3 +1,4 @@
+import time
 from datetime import date
 import streamlit as st
 import pandas as pd
@@ -8,6 +9,7 @@ from src.models.schemas import (
     OPCOES_TX_INCIDE, OPCOES_MOTIVO_BAIXA, OPCOES_GARANTIA,
     OPCOES_TIPO_CONTRATO, OPCOES_MOTIVO_RESCISAO, BAIRROS_PRINCIPAIS
 )
+
 from src.models.repository import (
     ingerir_e_persistir_lote,
     inserir_registro_manual,
@@ -15,27 +17,50 @@ from src.models.repository import (
     remover_imovel_crud
 )
 
-
 def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
+    
     st.subheader("Ingestão Inteligente de Arquivos & Governança LGPD")
     st.caption("Detecção automática da tabela por Conjuntos (Sets), Hashing SHA-256 em memória RAM e atualização sem duplicidades.")
+
+    if "mensagens_ingestao" not in st.session_state:
+        st.session_state.mensagens_ingestao = []
+    if "uploader_lote_id" not in st.session_state:
+        st.session_state.uploader_lote_id = 0
+
+    placeholder_alertas = st.empty()
 
     arquivos = st.file_uploader(
         "Envie planilhas ou arquivos estruturados (.xlsx, .csv, .json, .xml)",
         type=["xlsx", "xls", "csv", "json", "xml"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key=f"uploader_lote_{st.session_state.uploader_lote_id}"
     )
 
     if st.button("Validar Estrutura, Anonimizar (LGPD) e Salvar Lote", type="primary"):
         if not arquivos:
             st.warning("Selecione pelo menos um arquivo.")
         else:
+            novas_mensagens = []
+            teve_sucesso = False
+
             for arq in arquivos:
                 try:
-                    r = ingerir_e_persistir_lote(arq)
-                    st.success(f"`{arq.name}` → **{r['tipo']}** | Lidos: {r['lidos']} | Novos: {r['novos']} | Atualizados: {r['atualizados']} | Total: {r['total']}")
+                    with st.spinner(f"Processando e anonimizando `{arq.name}`..."):
+                        r = ingerir_e_persistir_lote(arq)
+                    novas_mensagens.append((
+                        "sucesso",
+                        f"✅ Arquivo `{arq.name}` processado com sucesso como **{r['tipo']}**! "
+                        f"Registros lidos: **{r['lidos']}** | Novos inseridos: **{r['novos']}** | "
+                        f"Atualizados (sem duplicar): **{r['atualizados']}** | Total na base: **{r['total']}**"
+                    ))
+                    teve_sucesso = True
                 except Exception as e:
-                    st.error(f"Falha em `{arq.name}`: {e}")
+                    novas_mensagens.append(("erro", f"❌ Falha em `{arq.name}`: {e}"))
+            
+            if teve_sucesso:
+                st.session_state.uploader_lote_id += 1
+
+            st.session_state.mensagens_ingestao = novas_mensagens
             st.rerun()
 
     st.markdown("#### Operações Manuais Discretas (Uso Pontual)")
@@ -46,6 +71,7 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
             "Nos cadastros manuais abaixo, todos os dados sensíveis informados (como CPF/CNPJ e Nome) "
             "recebem a mesma criptografia SHA-256 e descarte LGPD antes da gravação em disco."
         )
+        # Botão de rádio horizontal para alternar entre o formulário de Imóvel ou de Contrato
         tipo_cad = st.radio("Modelo de Registro:", ["Imóvel na Carteira", "Contrato Rescindido"], horizontal=True)
 
         if tipo_cad == "Imóvel na Carteira":
@@ -83,7 +109,10 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
                         "Propr. - CPF | CPNJ": cpf_prop, "Propr. - Nome | Razão Social": nome_prop,
                         "Endereço": end_imovel, "Data de Cadastro": str(date.today())
                     })
-                    st.success(f"Imóvel `{res_m['referencia']}` salvo! Hash SHA-256: `{res_m['hash_gerado']}`")
+                    st.session_state.mensagens_ingestao = [(
+                        "sucesso",
+                        f"✅ Imóvel `{res_m['referencia']}` salvo! Hash SHA-256: `{res_m['hash_gerado']}`"
+                    )]
                     st.rerun()
         else:
             with st.form("form_manual_contrato"):
@@ -112,7 +141,10 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
                         "Valor Líquido": val_c, "Motivo de Rescisão": mot_resc, "Status": "Rescindido",
                         "Inq - CPF/CNPJ": cpf_inq, "Inq - Nome": nome_inq
                     })
-                    st.success(f"Contrato `{res_mc['referencia']}` salvo com sucesso!")
+                    st.session_state.mensagens_ingestao = [(
+                        "sucesso",
+                        f"✅ Contrato `{res_mc['referencia']}` salvo com sucesso!"
+                    )]
                     st.rerun()
 
     with st.expander("Gestão de Ciclo de Vida do Imóvel (CRUD Discreto — Entrada, Baixa e Retorno)", expanded=False):
@@ -124,6 +156,7 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
 
             with st.form("form_crud_imovel"):
                 u1, u2, u3, u4 = st.columns(4)
+                
                 st_atual = str(linha_atual.get("Status", "Alugado"))
                 idx_st = OPCOES_STATUS_IMOVEL.index(st_atual) if st_atual in OPCOES_STATUS_IMOVEL else 0
                 novo_status = u1.selectbox("Status do Imóvel", options=list(OPCOES_STATUS_IMOVEL), index=idx_st)
@@ -142,6 +175,7 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
                 novo_cpf_prop = u6.text_input("Novo CPF/CNPJ Proprietário (Opcional)")
 
                 b_up, b_del = st.columns(2)
+                
                 if b_up.form_submit_button("Salvar Alterações / Reentrada"):
                     campos_up = {"Status": novo_status, "Valor Líquido": novo_aluguel, "Taxa de Condominio": novo_cond, "Repasse Garantido": novo_repasse}
                     if novo_status == "Baixado":
@@ -153,10 +187,30 @@ def renderizar_ingestao_dados(df_imoveis: pd.DataFrame):
                     if novo_cpf_prop.strip():
                         campos_up["Propr. - CPF | CPNJ"] = novo_cpf_prop.strip()
                     atualizar_imovel_crud(ref_busca, campos_up)
-                    st.success(f"Imóvel `{ref_busca}` atualizado para **{novo_status}**!")
+                    st.session_state.mensagens_ingestao = [(
+                        "sucesso",
+                        f"Imóvel `{ref_busca}` atualizado para **{novo_status}**!"
+                    )]
                     st.rerun()
 
                 if b_del.form_submit_button("Excluir Imóvel"):
                     remover_imovel_crud(ref_busca)
-                    st.warning(f"Imóvel `{ref_busca}` excluído.")
+                    st.session_state.mensagens_ingestao = [(
+                        "aviso",
+                        f"Imóvel `{ref_busca}` excluído."
+                    )]
                     st.rerun()
+
+    if st.session_state.mensagens_ingestao:
+        with placeholder_alertas.container():
+            for status_msg, texto_msg in st.session_state.mensagens_ingestao:
+                if status_msg == "sucesso":
+                    st.success(texto_msg)
+                elif status_msg == "aviso":
+                    st.warning(texto_msg)
+                else:
+                    st.error(texto_msg)
+                time.sleep(0.25)
+        st.session_state.mensagens_ingestao = []
+        time.sleep(3.5)
+        placeholder_alertas.empty()
