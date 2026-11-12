@@ -1,7 +1,3 @@
-"""
-Camada View: Componentes globais de interface (CSS, Ampliação de Gráficos e Menu Lateral).
-"""
-
 import streamlit as st
 import pandas as pd
 
@@ -15,7 +11,6 @@ from src.controllers.data_processor import configurar_estilo_grafico
 
 
 def exibir_grafico_responsivo(fig, chave_grafico: str):
-    """Exibe o gráfico com opção de ampliar e fechar sem sobrepor seletores."""
     esta_ampliado = (st.session_state.grafico_ampliado_id == chave_grafico)
 
     if esta_ampliado:
@@ -40,7 +35,6 @@ def exibir_grafico_responsivo(fig, chave_grafico: str):
 
 
 def aplicar_css_global(tema: str):
-    """Configura o contraste dos temas Claro e Escuro e oculta botões flutuantes intrusivos."""
     configurar_estilo_grafico(tema)
 
     css_comum = """
@@ -141,7 +135,6 @@ def aplicar_css_global(tema: str):
 
 
 def renderizar_sidebar(config_usuario: dict, df_imoveis: pd.DataFrame, df_contratos: pd.DataFrame):
-    """Renderiza o menu lateral com seletor de tema e submenus expansíveis."""
     with st.sidebar:
         st.markdown("### Baggio Intelligence")
         st.caption("Analytics, Governança LGPD & IA")

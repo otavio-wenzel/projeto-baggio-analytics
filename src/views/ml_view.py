@@ -1,7 +1,3 @@
-"""
-Camada View: Tela do Laboratório de Predição (ML), Classificadores e Simulador Executivo.
-"""
-
 import streamlit as st
 import pandas as pd
 

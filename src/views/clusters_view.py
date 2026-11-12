@@ -1,7 +1,3 @@
-"""
-Camada View: Tela de Clusterização de Personas (K-Means/Ward) e Anomalias (DBSCAN/PCA).
-"""
-
 import streamlit as st
 import pandas as pd
 
@@ -32,7 +28,6 @@ def renderizar_tela_clusters(df_imoveis: pd.DataFrame, df_contratos: pd.DataFram
 
     opcoes_extras_cl = [c for c in CATALOGO_SUBMODULOS_CLUSTER if c != st.session_state.submodulo_cluster_ativo]
     cl_agrupados = c_cl2.multiselect(
-        "Agrupar Mais Vistas de Cluster nesta Sessão (Opcional):",
         options=opcoes_extras_cl,
         default=[],
         key=f"agr_cl_{st.session_state.submodulo_cluster_ativo}"
