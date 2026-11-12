@@ -3,7 +3,7 @@
 Aplicação web interativa desenvolvida em Python e Streamlit para diagnóstico operacional, retenção de carteira imobiliária, governança de dados sob a Lei Geral de Proteção de Dados (LGPD) e modelagem preditiva com aprendizado de máquina supervisionado e não supervisionado.
 
 * **Disciplina:** Tópicos Especiais em Software
-* **Professor:** Rhafael Freitas da Costa - [@rhafael-costa-dev](https://github.com/username)
+* **Professor:** Rhafael Freitas da Costa - [@rhafael-costa-dev](https://github.com/rhafael-costa-dev)
 * **Arquitetura:** Padrão MVC (*Model-View-Controller*) com Princípio da Responsabilidade Única (SRP)
 
 ---
