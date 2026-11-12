@@ -3,7 +3,7 @@
 Aplicação web interativa desenvolvida em Python e Streamlit para diagnóstico operacional, retenção de carteira imobiliária, governança de dados sob a Lei Geral de Proteção de Dados (LGPD) e modelagem preditiva com aprendizado de máquina supervisionado e não supervisionado.
 
 * **Disciplina:** Tópicos Especiais em Software
-* **Professor:** Rhafael Freitas da Costa - [@hafael-costa-dev](https://github.com/username)
+* **Professor:** Rhafael Freitas da Costa - [@rhafael-costa-dev](https://github.com/username)
 * **Arquitetura:** Padrão MVC (*Model-View-Controller*) com Princípio da Responsabilidade Única (SRP)
 
 ---
@@ -117,7 +117,9 @@ Nenhuma informação pessoal identificável (PII) de proprietários ou inquilino
 
 * **Pseudonimização Irreversível com Hash SHA-256 + *Salt*:**
   O documento do proprietário (`Propr. - CPF | CPNJ`) é combinado a uma chave secreta carregada via variável de ambiente (`LGPD_HASH_SALT`) e criptografado pelo algoritmo SHA-256 truncado nos 12 primeiros caracteres hexadecimais:
-  $$\text{Hash\_Proprietario} = \text{SHA256}(\text{Documento} \parallel \text{"\_"} \parallel \text{LGPD\_HASH\_SALT})[0:12]$$
+
+$$\text{Hash Proprietario} = \text{SHA256}(\text{Documento} + \text{Salt})[0:12]$$
+
 * **Preservação da Inteligência Analítica (Porte do Investidor):**
   Antes e após cada consolidação da base de imóveis, a função `recalcular_porte_carteira()` agrupa os registros pelo `Hash_Proprietario` para calcular o número exato de imóveis pertencentes ao mesmo investidor (`Qtd_Imoveis_Proprietario`) e classificá-lo em quatro faixas (`Faixa_Carteira_Prop`: *1 Imóvel (Pequeno)*, *2 a 3 Imóveis*, *4 a 10 Imóveis (Médio)* e *+10 Imóveis (Grande)*).
 * **Descarte Definitivo de Colunas Sensíveis (`drop`):**
@@ -133,12 +135,16 @@ No módulo `src/controllers/data_processor.py`, a função `preparar_base_cruzad
 1. **Cruzamento Relacional (`Inner Join`):** Realiza o `pd.merge` entre `df_contratos` e `df_imoveis` conectando a chave estrangeira `Referência Imóvel` à chave primária `Referência`.
 2. **Engenharia das Variáveis-Alvo (*Targets*):**
    * **Tempo de Permanência Contínuo (`Meses_Locados`):**
-     $$\text{Meses\_Locados} = \frac{\text{Data de Rescisão} - \text{Data de Início}}{30,0}$$
-   * **Quebra Antecipada do Inquilino (`Quebra_Antecipada` $\in \{0, 1\}$):** Assume valor $1$ quando $\text{Data de Rescisão} < \text{Data de Término}$, e $0$ caso contrário.
-   * **Evasão do Proprietário (`Proprietario_Evadiu` $\in \{0, 1\}$):** Assume valor $1$ quando o status atual do imóvel na carteira é `"Baixado"`, e $0$ caso contrário.
+
+$$\text{Meses Locados} = \frac{\text{Data de Rescisão} - \text{Data de Início}}{30,0}$$
+
+   * **Quebra Antecipada do Inquilino (`Quebra_Antecipada` binária $0 \text{ ou } 1$):** Assume valor $1$ quando `Data de Rescisão < Data de Término`, e $0$ caso contrário.
+   * **Evasão do Proprietário (`Proprietario_Evadiu` binária $0 \text{ ou } 1$):** Assume valor $1$ quando o status atual do imóvel na carteira é `"Baixado"`, e $0$ caso contrário.
 3. **Saneamento de *Outliers* pela Cerca Interquartil (IQR):**
-   Filtra registros inconsistentes ($\text{Meses\_Locados} \le 0$) e calcula o primeiro quartil ($Q_1$, percentil $25\%$) e o terceiro quartil ($Q_3$, percentil $75\%$), definindo a amplitude interquartil $\text{IQR} = Q_3 - Q_1$ e o limite superior de corte configurável por $k$ (padrão $k = 1,5$):
-   $$\text{Limite Superior} = Q_3 + k \cdot (Q_3 - Q_1)$$
+   Filtra registros inconsistentes (`Meses_Locados` $\le 0$) e calcula o primeiro quartil ($Q_1$, percentil 25%) e o terceiro quartil ($Q_3$, percentil 75%), definindo a amplitude interquartil $\text{IQR} = Q_3 - Q_1$ e o limite superior de corte configurável por $k$ (padrão $k = 1,5$):
+
+$$\text{Limite Superior} = Q_3 + k \cdot (Q_3 - Q_1)$$
+
    Apenas contratos dentro do limite estatístico compõem o DataFrame saneado (`df_limpo`), evitando distorções nas médias e nos modelos preditivos.
 
 ---
@@ -149,13 +155,13 @@ A tela **Explorador de Análises Independentes & Compositor de Sessão** (`src/v
 
 | Código | Nome da Análise | Principais Controles Interativos e Método Estatístico |
 | :--- | :--- | :--- |
-| **A1** | **Escalada Anual de Retiradas** | Filtro de intervalo de anos, tipos de imóvel, alternância entre contagem absoluta ou participação ($\%$) e escolha de gráfico (Barras Verticais, Linha com Marcadores ou Pizza). |
+| **A1** | **Escalada Anual de Retiradas** | Filtro de intervalo de anos, tipos de imóvel, alternância entre contagem absoluta ou participação (%) e escolha de gráfico (Barras Verticais, Linha com Marcadores ou Pizza). |
 | **A2** | **Sazonalidade Mensal (Picos Automáticos)** | Filtro de anos, recorte de meses ($1$ a $12$), seleção de motivos de baixa e detector automático de janelas de pico sazonal onde o volume mensal supera $\mu + k \cdot \sigma$ (média mais $k$ desvios-padrão configuráveis pelo *slider* de sensibilidade). |
-| **A3** | **Ranking de Motivos de Evasão / Rescisão** | Alterna a fonte de dados entre *Imóveis (Motivo de Baixa do Proprietário)* e *Contratos (Motivo de Rescisão do Inquilino)*, com filtro temporal, *Top N* motivos e unidade em percentual ($\%$) ou volume absoluto. |
-| **A4** | **Política Interna: Repasse Garantido** | Compara a retenção (*Alugado*) versus evasão (*Baixado*) por regra de Repasse Garantido, filtrando por faixa de valor líquido do aluguel ($\text{R\$}$) e tipos de imóvel. |
-| **A5** | **Política Interna: Base da Taxa Adm.** | Avalia o impacto da regra de incidência da Taxa Administrativa sobre a taxa de evasão ($\%$ Baixado) ou sobre o aluguel líquido médio ($\text{R\$}$), com corte mínimo de representatividade amostral. |
+| **A3** | **Ranking de Motivos de Evasão / Rescisão** | Alterna a fonte de dados entre *Imóveis (Motivo de Baixa do Proprietário)* e *Contratos (Motivo de Rescisão do Inquilino)*, com filtro temporal, *Top N* motivos e unidade em percentual (%) ou volume absoluto. |
+| **A4** | **Política Interna: Repasse Garantido** | Compara a retenção (*Alugado*) versus evasão (*Baixado*) por regra de Repasse Garantido, filtrando por faixa de valor líquido do aluguel (R$) e tipos de imóvel. |
+| **A5** | **Política Interna: Base da Taxa Adm.** | Avalia o impacto da regra de incidência da Taxa Administrativa sobre a taxa de evasão (% Baixado) ou sobre o aluguel líquido médio (R$), com corte mínimo de representatividade amostral. |
 | **A6** | **Perfil do Investidor (Porte da Carteira)** | Cruza as faixas de carteira calculadas via Hash SHA-256 com o percentual de retenção/evasão, aluguel líquido médio ou condomínio médio (filtrando até o percentil $P_{95}$). |
-| **A7** | **Geografia de Evasão por Bairro** | Diagnóstico nos *Top N* maiores bairros da carteira comparando a taxa de evasão ($\%$ Baixado com linha de referência de $35\%$) ou as medianas de aluguel e condomínio. |
+| **A7** | **Geografia de Evasão por Bairro** | Diagnóstico nos *Top N* maiores bairros da carteira comparando a taxa de evasão (% Baixado com linha de referência de 35%) ou as medianas de aluguel e condomínio. |
 | **A8** | **Garantias Locatícias, IQR & Correlação** | Três modos visuais: (1) Permanência média por modalidade de garantia; (2) Auditoria *Boxplot* lado a lado (Base Bruta vs. Base Saneada pela cerca $k \times \text{IQR}$); (3) Mapa de Calor da Matriz de Correlação Linear de Pearson ($r$). |
 | **A9** | **Construtor Livre de Cruzamentos** | Permite ao usuário cruzar livremente qualquer variável categórica (Eixo X) com qualquer métrica numérica (Eixo Y), escolhendo entre Barras Verticais, Barras Horizontais, *Boxplot*, Dispersão (*Scatter*) ou Pizza, com filtro de *outliers* por percentil ($P_{85}$ a $P_{100}$). |
 
@@ -174,23 +180,23 @@ Implementado em `src/controllers/ml_supervisionado_ctrl.py` e `src/views/ml_view
   4. `Regressão Lasso (Penalidade L1)` via pipeline com `StandardScaler()` e `Lasso(alpha=alpha)`.
   5. `Árvore de Decisão (Regressor)` via `DecisionTreeRegressor(max_depth=max_depth)`.
   6. `Floresta Aleatória (Random Forest)` via `RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth)`.
-* **Hiperparâmetros Configuráveis pelo Usuário:** Penalidade de regularização $\alpha$ ($0,1$ a $20,0$), profundidade máxima das árvores ($2$ a $15$), número de árvores na floresta ($20$ a $300$) e proporção da divisão de teste `test_size` ($15\%$ a $35\%$).
-* **Métricas e Diagnóstico Automático:** Calcula o RMSE médio e desvio-padrão ($\pm$) na validação cruzada `KFold` (`scoring="neg_root_mean_squared_error"`), MAE no teste, RMSE no teste, Coeficiente de Determinação $R^2$ ($\%$) e emite o diagnóstico automático de ajuste (*Subajuste / Alta Variância*, *Indício de Sobreajuste* ou *Bom Ajuste*), acompanhado do gráfico *Real vs. Predito* e do ranking de impacto das variáveis (`coef_` ou `feature_importances_`).
+* **Hiperparâmetros Configuráveis pelo Usuário:** Penalidade de regularização $\alpha$ ($0,1$ a $20,0$), profundidade máxima das árvores ($2$ a $15$), número de árvores na floresta ($20$ a $300$) e proporção da divisão de teste `test_size` (15% a 35%).
+* **Métricas e Diagnóstico Automático:** Calcula o RMSE médio e desvio-padrão ($\pm$) na validação cruzada `KFold` (`scoring="neg_root_mean_squared_error"`), MAE no teste, RMSE no teste, Coeficiente de Determinação $R^2$ (%) e emite o diagnóstico automático de ajuste (*Subajuste / Alta Variância*, *Indício de Sobreajuste* ou *Bom Ajuste*), acompanhado do gráfico *Real vs. Predito* e do ranking de impacto das variáveis (`coef_` ou `feature_importances_`).
 
 ### 7.2. Classificadores Supervisionados de Risco
-* **Variáveis Alvo Configuráveis ($y \in \{0, 1\}$):** `Quebra_Antecipada` (rescisão antes do prazo contratual) ou `Proprietario_Evadiu` (baixa do imóvel pelo proprietário).
+* **Variáveis Alvo Configuráveis ($y$ binário $0 \text{ ou } 1$):** `Quebra_Antecipada` (rescisão antes do prazo contratual) ou `Proprietario_Evadiu` (baixa do imóvel pelo proprietário).
 * **Algoritmos Disponíveis:**
   1. `Floresta Aleatória (Classificador)` (`RandomForestClassifier`)
   2. `Regressão Logística` (`LogisticRegression`)
   3. `Vizinhos Mais Próximos (KNN)` (`KNeighborsClassifier`)
   4. `Árvore de Decisão (Classificador)` (`DecisionTreeClassifier`)
-* **Hiperparâmetros e Avaliação:** Permite calibrar em tempo real o parâmetro de regularização $C$ (Logística) ou número de vizinhos $K$ (KNN) de $1,0$ a $15,0$, além da profundidade máxima das árvores ($2$ a $15$), exibindo **Acurácia ($\%$)**, **F1-Score ($\%$)** e o mapa de calor da **Matriz de Confusão**.
+* **Hiperparâmetros e Avaliação:** Permite calibrar em tempo real o parâmetro de regularização $C$ (Logística) ou número de vizinhos $K$ (KNN) de $1,0$ a $15,0$, além da profundidade máxima das árvores ($2$ a $15$), exibindo **Acurácia (%)**, **F1-Score (%)** e o mapa de calor da **Matriz de Confusão**.
 
 ### 7.3. Simulador Executivo de Novos Contratos & Retreinamento Dinâmico
 * Permite selecionar simultaneamente o algoritmo regressor, o algoritmo classificador e o tipo de risco avaliado.
 * Ao preencher os atributos de um novo contrato em negociação (Aluguel Líquido, Taxa de Condomínio, Área Total em $\text{m}^2$, Total de Quartos, Modalidade de Garantia, Política de Repasse, Bairro e Quantidade de Imóveis do Proprietário), o sistema monta o vetor padronizado e estima instantaneamente:
   1. A **Permanência Estimada em Meses** e o delta ($\pm$) em relação à média histórica da carteira.
-  2. A **Probabilidade de Risco ($\%$)** via `predict_proba`, classificando o cenário em *Risco Controlado* ou *Risco Elevado*.
+  2. A **Probabilidade de Risco (%)** via `predict_proba`, classificando o cenário em *Risco Controlado* ou *Risco Elevado*.
 * **Retreinamento Dinâmico:** Como o pipeline lê as bases atualizadas a cada ciclo de execução, qualquer novo upload em lote, cadastro avulso ou edição CRUD na aba de Ingestão recalibra imediatamente os modelos preditivos.
 
 ---
